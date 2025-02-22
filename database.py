@@ -15,6 +15,7 @@ def create_tables():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             description TEXT NOT NULL,
             code TEXT NOT NULL,
+            brand TEXT,  -- Nova coluna para marca
             status TEXT NOT NULL,
             suppliers_prices TEXT NOT NULL
         )
@@ -39,25 +40,25 @@ def create_tables():
     conn.close()
 
 # Inserir novo item
-def insert_item(description, code, status, suppliers_prices):
+def insert_item(description, code, brand, status, suppliers_prices):
     conn = create_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO items (description, code, status, suppliers_prices)
-        VALUES (?, ?, ?, ?)
-    ''', (description, code, status, json.dumps(suppliers_prices)))
+        INSERT INTO items (description, code, brand, status, suppliers_prices)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (description, code, brand, status, json.dumps(suppliers_prices)))
     conn.commit()
     conn.close()
 
 # Atualizar item existente
-def update_item(item_id, description, code, status, suppliers_prices):
+def update_item(item_id, description, code, brand, status, suppliers_prices):
     conn = create_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE items
-        SET description = ?, code = ?, status = ?, suppliers_prices = ?
+        SET description = ?, code = ?, brand = ?, status = ?, suppliers_prices = ?
         WHERE id = ?
-    ''', (description, code, status, json.dumps(suppliers_prices), item_id))
+    ''', (description, code, brand, status, json.dumps(suppliers_prices), item_id))
     conn.commit()
     conn.close()
 
@@ -76,7 +77,7 @@ def get_all_items():
     cursor.execute('SELECT * FROM items')
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], json.loads(item[4])) for item in items]
+    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
 
 # Buscar itens por status
 def get_items_by_status(status):
@@ -85,7 +86,7 @@ def get_items_by_status(status):
     cursor.execute('SELECT * FROM items WHERE status = ?', (status,))
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], json.loads(item[4])) for item in items]
+    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
 
 # Buscar itens por fornecedor
 def get_items_by_supplier(supplier):
@@ -94,7 +95,7 @@ def get_items_by_supplier(supplier):
     cursor.execute('SELECT * FROM items WHERE suppliers_prices LIKE ?', (f'%{supplier}%',))
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], json.loads(item[4])) for item in items]
+    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
 
 # Cadastrar empresa
 def insert_company(name, cnpj, buyer_name):
