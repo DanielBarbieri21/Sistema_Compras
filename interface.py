@@ -14,7 +14,7 @@ database.create_tables()
 # Variáveis globais
 root = tk.Tk()
 root.title("Sistema de Compras")
-root.geometry("1400x800")  # Aumentei ainda mais o tamanho horizontal da janela para acomodar o filtro
+root.geometry("1400x800")  # Mantive o tamanho maior da janela
 
 # Carregar o logotipo como fundo
 def load_background():
@@ -27,10 +27,10 @@ def load_background():
 
         logo_path = os.path.join(base_path, "Logo.jpg")
         img = Image.open(logo_path)
-        img = img.resize((1400, 800), Image.Resampling.LANCZOS)  # Ajustei o tamanho do logotipo
+        img = img.resize((1400, 800), Image.Resampling.LANCZOS)  # Mantive o tamanho do logotipo
         background_image = ImageTk.PhotoImage(img)
         background_label = tk.Label(root, image=background_image)
-        background_label.image = background_image
+        background_label.image = background_image  # Mantém referência para evitar garbage collection
         background_label.place(x=0, y=0, relwidth=1, relheight=1)
     except Exception as e:
         messagebox.showwarning("Aviso", f"Erro ao carregar o logotipo: {e}. Continuando sem fundo.")
@@ -39,7 +39,7 @@ def load_background():
 def add_item():
     description = entry_description.get()
     code = entry_code.get()
-    brand = entry_brand.get()  # Novo campo para marca
+    brand = entry_brand.get()  # Campo para marca
     supplier = entry_supplier.get()
     price = entry_price.get()
     if not description or not code or not supplier or not price:
@@ -113,7 +113,7 @@ def filter_items():
     update_item_list(items)
 
 def generate_excel():
-    supplier = entry_export_supplier.get()  # Novo campo para especificar fornecedor
+    supplier = entry_export_supplier.get()  # Campo para especificar fornecedor
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Itens"
@@ -143,7 +143,7 @@ def import_excel():
         messagebox.showerror("Erro", f"Erro ao importar planilha: {e}")
 
 def generate_pdf():
-    supplier = entry_pdf_supplier.get()  # Novo campo para especificar fornecedor
+    supplier = entry_pdf_supplier.get()  # Campo para especificar fornecedor
     company = database.get_company()
     if not company:
         messagebox.showerror("Erro", "Cadastre a empresa primeiro!")
@@ -256,7 +256,7 @@ tk.Button(root, text="Marcar como Comprado", command=mark_as_purchased).pack(pad
 tk.Button(root, text="Marcar como Parcialmente Comprado", command=mark_as_partially_purchased).pack(pady=5)
 
 # Lista de itens no centro (aumentada)
-list_items = tk.Listbox(root, height=20, width=80)  # Mantive o tamanho da lista, mas ajustado para a nova janela
+list_items = tk.Listbox(root, height=20, width=90)  # Mantive o tamanho da lista
 list_items.pack(pady=10)
 
 update_item_list()
@@ -275,7 +275,7 @@ combo_supplier.pack(pady=5, fill=tk.X)
 
 tk.Button(filter_frame, text="Filtrar", command=filter_items, width=20).pack(pady=10)
 
-# Campos para exportar e PDF com fornecedor (maiores)
+# Campos para exportar, importar e PDF com fornecedor (maiores)
 tk.Label(filter_frame, text="Fornecedor para Exportar Excel:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
 entry_export_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
 entry_export_supplier.pack(pady=5, fill=tk.X)
@@ -285,6 +285,7 @@ entry_pdf_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(),
 entry_pdf_supplier.pack(pady=5, fill=tk.X)
 
 tk.Button(filter_frame, text="Exportar Excel", command=generate_excel, width=20).pack(pady=5)
+tk.Button(filter_frame, text="Importar Excel", command=import_excel, width=20).pack(pady=5)
 tk.Button(filter_frame, text="Gerar Pedido em PDF", command=generate_pdf, width=20).pack(pady=5)
 
 # Menu
@@ -295,5 +296,11 @@ cadastro_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Cadastro", menu=cadastro_menu)
 cadastro_menu.add_command(label="Cadastrar Empresa", command=open_company_window)
 cadastro_menu.add_command(label="Cadastrar Fornecedor", command=open_supplier_window)
+
+compras_menu = tk.Menu(menu, tearoff=0)
+menu.add_cascade(label="Compras", menu=compras_menu)
+compras_menu.add_command(label="Gerar Planilha Excel", command=generate_excel)
+compras_menu.add_command(label="Importar Planilha Preenchida", command=import_excel)
+compras_menu.add_command(label="Gerar Pedido em PDF", command=generate_pdf)
 
 root.mainloop()
