@@ -1,5 +1,3 @@
-import os
-import sys
 import tkinter as tk
 from tkinter import messagebox, ttk, filedialog
 from PIL import Image, ImageTk
@@ -7,6 +5,8 @@ import database
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import sys
+import os
 
 # Inicializar o banco de dados
 database.create_tables()
@@ -16,16 +16,20 @@ root = tk.Tk()
 root.title("Sistema de Compras")
 root.geometry("1400x800")
 
+# Função para determinar o caminho base
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
 # Carregar o logotipo como fundo
 def load_background():
     try:
-        # Determina o caminho base dependendo se é executável ou script
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
+        base_path = get_base_path()
         logo_path = os.path.join(base_path, "Logo.jpg")
+        if not os.path.exists(logo_path):
+            raise FileNotFoundError("Logo.jpg não encontrado.")
         img = Image.open(logo_path)
         img = img.resize((1400, 800), Image.Resampling.LANCZOS)
         background_image = ImageTk.PhotoImage(img)
@@ -35,7 +39,7 @@ def load_background():
     except Exception as e:
         messagebox.showwarning("Aviso", f"Erro ao carregar o logotipo: {e}. Continuando sem fundo.")
 
-# Funções da interface (mantidas como no código original)
+# Funções da interface
 def add_item():
     description = entry_description.get()
     code = entry_code.get()
@@ -125,20 +129,11 @@ def generate_excel():
     wb.save("itens.xlsx")
     messagebox.showinfo("Sucesso", "Planilha gerada como 'itens.xlsx'")
 
-# Função revisada para importar Excel
 def import_excel():
     try:
-        # Determina o caminho base dependendo se é executável ou script
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
+        base_path = get_base_path()
         excel_path = os.path.join(base_path, "itens_preenchidos.xlsx")
-
-        # Verifica se o arquivo existe
         if not os.path.exists(excel_path):
-            # Se não encontrado, permite ao usuário selecionar o arquivo
             excel_path = filedialog.askopenfilename(
                 title="Selecione o arquivo Excel",
                 filetypes=[("Excel files", "*.xlsx")],
@@ -147,7 +142,6 @@ def import_excel():
             if not excel_path:
                 messagebox.showwarning("Aviso", "Importação cancelada. Nenhum arquivo selecionado.")
                 return
-
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -156,7 +150,6 @@ def import_excel():
             for item in items:
                 if item[1] == description and item[2] == code and (item[3] or 'N/A') == (brand or 'N/A'):
                     suppliers_prices = item[5]
-                    # Ajuste para lidar com diferentes formatos de preço
                     if isinstance(price, str):
                         price = price.replace('R$', '').replace('.', '').replace(',', '.')
                     suppliers_prices[supplier] = float(price) if price else 0
@@ -252,65 +245,69 @@ def open_supplier_window():
 # Carregar o fundo ao iniciar
 load_background()
 
-# Campos de entrada no centro
-tk.Label(root, text="Descrição:", bg="white").pack(pady=5)
-entry_description = tk.Entry(root, width=40)
+# Criar frames para layout
+left_frame = tk.Frame(root)
+left_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+
+right_frame = tk.Frame(root)
+right_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+# Inputs no frame esquerdo
+tk.Label(left_frame, text="Descrição:", bg="white").pack(pady=5)
+entry_description = tk.Entry(left_frame, width=40)
 entry_description.pack(pady=5)
 
-tk.Label(root, text="Código:", bg="white").pack(pady=5)
-entry_code = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Código:", bg="white").pack(pady=5)
+entry_code = tk.Entry(left_frame, width=40)
 entry_code.pack(pady=5)
 
-tk.Label(root, text="Marca:", bg="white").pack(pady=5)
-entry_brand = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Marca:", bg="white").pack(pady=5)
+entry_brand = tk.Entry(left_frame, width=40)
 entry_brand.pack(pady=5)
 
-tk.Label(root, text="Fornecedor:", bg="white").pack(pady=5)
-entry_supplier = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Fornecedor:", bg="white").pack(pady=5)
+entry_supplier = tk.Entry(left_frame, width=40)
 entry_supplier.pack(pady=5)
 
-tk.Label(root, text="Preço:", bg="white").pack(pady=5)
-entry_price = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Preço:", bg="white").pack(pady=5)
+entry_price = tk.Entry(left_frame, width=40)
 entry_price.pack(pady=5)
 
-# Botões no centro
-tk.Button(root, text="Adicionar Item", command=add_item).pack(pady=5)
-tk.Button(root, text="Remover Item", command=remove_item).pack(pady=5)
-tk.Button(root, text="Marcar como Comprado", command=mark_as_purchased).pack(pady=5)
-tk.Button(root, text="Marcar como Parcialmente Comprado", command=mark_as_partially_purchased).pack(pady=5)
+# Botões no frame esquerdo
+tk.Button(left_frame, text="Adicionar Item", command=add_item).pack(pady=5)
+tk.Button(left_frame, text="Remover Item", command=remove_item).pack(pady=5)
+tk.Button(left_frame, text="Marcar como Comprado", command=mark_as_purchased).pack(pady=5)
+tk.Button(left_frame, text="Marcar como Parcialmente Comprado", command=mark_as_partially_purchased).pack(pady=5)
 
 # Lista de itens no centro
 list_items = tk.Listbox(root, height=20, width=90)
-list_items.pack(pady=10)
+list_items.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
 
 update_item_list()
 
-# Filtros no lado direito
-filter_frame = tk.Frame(root)
-filter_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)
-
-tk.Label(filter_frame, text="Filtrar por Status:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-combo_status = ttk.Combobox(filter_frame, values=["A Comprar", "Comprado", "Parcialmente Comprado"], width=60)
+# Filtros no frame direito
+tk.Label(right_frame, text="Filtrar por Status:", bg="white").pack(pady=5, anchor="w")
+combo_status = ttk.Combobox(right_frame, values=["A Comprar", "Comprado", "Parcialmente Comprado"], width=40)
 combo_status.pack(pady=5, fill=tk.X)
 
-tk.Label(filter_frame, text="Filtrar por Fornecedor:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-combo_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Filtrar por Fornecedor:", bg="white").pack(pady=5, anchor="w")
+combo_supplier = ttk.Combobox(right_frame, values=database.get_suppliers(), width=40)
 combo_supplier.pack(pady=5, fill=tk.X)
 
-tk.Button(filter_frame, text="Filtrar", command=filter_items, width=20).pack(pady=10)
+tk.Button(right_frame, text="Filtrar", command=filter_items, width=20).pack(pady=10)
 
 # Campos para exportar, importar e PDF com fornecedor
-tk.Label(filter_frame, text="Fornecedor para Exportar Excel:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-entry_export_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Fornecedor para Exportar Excel:", bg="white").pack(pady=5, anchor="w")
+entry_export_supplier = ttk.Combobox(right_frame, values=database.get_suppliers(), width=40)
 entry_export_supplier.pack(pady=5, fill=tk.X)
 
-tk.Label(filter_frame, text="Fornecedor para Pedido PDF:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-entry_pdf_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Fornecedor para Pedido PDF:", bg="white").pack(pady=5, anchor="w")
+entry_pdf_supplier = ttk.Combobox(right_frame, values=database.get_suppliers(), width=40)
 entry_pdf_supplier.pack(pady=5, fill=tk.X)
 
-tk.Button(filter_frame, text="Exportar Excel", command=generate_excel, width=20).pack(pady=5)
-tk.Button(filter_frame, text="Importar Excel", command=import_excel, width=20).pack(pady=5)
-tk.Button(filter_frame, text="Gerar Pedido em PDF", command=generate_pdf, width=20).pack(pady=5)
+tk.Button(right_frame, text="Exportar Excel", command=generate_excel, width=20).pack(pady=5)
+tk.Button(right_frame, text="Importar Excel", command=import_excel, width=20).pack(pady=5)
+tk.Button(right_frame, text="Gerar Pedido em PDF", command=generate_pdf, width=20).pack(pady=5)
 
 # Menu
 menu = tk.Menu(root)
