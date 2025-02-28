@@ -188,17 +188,15 @@ def generate_pdf():
     c.drawString(100, 710, f"Comprador: {company[3]}")
     y = 690
     for item in items:
-        c.drawString(100, y, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'} - Quantidade: {item[5]}")
-        y -= 20
-        #c.drawString(100, y, f"Status: {item[4]}")
-        y -= 20
-        c.drawString(100, y, "Preços:")
-        y -= 20
-        for s, p in item[6].items():
-            if not supplier or s.strip() == supplier:
-                c.drawString(100, y, f"{s}: R${p:.2f}")
-                y -= 20
-        y -= 20  # Espaço extra entre itens
+        # Informações do item
+        item_info = f"I: {item[1]}  Cdg: {item[2]}  M: {item[3] or 'N/A'}  Qtd: {item[5]}"
+        # Preços dos fornecedores
+        prices_str = "  Prç: " + ", ".join([f"{s}: R${p:.2f}" for s, p in item[6].items() if not supplier or s.strip() == supplier])
+        # Combinar tudo em uma única linha
+        full_line = item_info + prices_str
+        # Desenhar na mesma linha
+        c.drawString(100, y, full_line)
+        y -= 30  # Próximo item
     c.save()
     messagebox.showinfo("Sucesso", f"Pedido gerado como 'pedido_{order_number}.pdf'")
 
