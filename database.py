@@ -6,7 +6,7 @@ def create_connection():
     conn = sqlite3.connect('database.db')
     return conn
 
-# Criação da tabela de itens
+# Criação das tabelas
 def create_tables():
     conn = create_connection()
     cursor = conn.cursor()
@@ -15,7 +15,7 @@ def create_tables():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             description TEXT NOT NULL,
             code TEXT NOT NULL,
-            brand TEXT,  -- Nova coluna para marca
+            brand TEXT,
             status TEXT NOT NULL,
             suppliers_prices TEXT NOT NULL
         )
@@ -92,10 +92,38 @@ def get_items_by_status(status):
 def get_items_by_supplier(supplier):
     conn = create_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM items WHERE suppliers_prices LIKE ?', (f'%{supplier}%',))
+    cursor.execute('SELECT * FROM items')
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
+    result = []
+    for item in items:
+        suppliers_prices = json.loads(item[5])
+        if supplier in suppliers_prices:
+            result.append((item[0], item[1], item[2], item[3], item[4], suppliers_prices))
+    return result
+
+# Busca combinada por status e fornecedor
+def get_items_by_status_and_supplier(status, supplier):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM items WHERE status = ?', (status,))
+    items = cursor.fetchall()
+    conn.close()
+    result = []
+    for item in items:
+        suppliers_prices = json.loads(item[5])
+        if supplier in suppliers_prices:
+            result.append((item[0], item[1], item[2], item[3], item[4], suppliers_prices))
+    return result
+
+# Buscar fornecedores
+def get_suppliers():
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT name FROM suppliers')
+    suppliers = cursor.fetchall()
+    conn.close()
+    return [s[0] for s in suppliers if s[0]]
 
 # Cadastrar empresa
 def insert_company(name, cnpj, buyer_name):
@@ -122,11 +150,60 @@ def get_company():
     conn.close()
     return company
 
-# Buscar fornecedores
-def get_suppliers():
+# Atualizar empresa
+def update_company(company_id, name, cnpj, buyer_name):
     conn = create_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT name FROM suppliers')
+    cursor.execute('''
+        UPDATE company
+        SET name = ?, cnpj = ?, buyer_name = ?
+        WHERE id = ?
+    ''', (name, cnpj, buyer_name, company_id))
+    conn.commit()
+    conn.close()
+
+# Excluir empresa
+def delete_company(company_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM company WHERE id = ?', (company_id,))
+    conn.commit()
+    conn.close()
+
+# Atualizar fornecedor
+def update_supplier(supplier_id, name, cnpj, seller_name):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE suppliers
+        SET name = ?, cnpj = ?, seller_name = ?
+        WHERE id = ?
+    ''', (name, cnpj, seller_name, supplier_id))
+    conn.commit()
+    conn.close()
+
+# Excluir fornecedor
+def delete_supplier(supplier_id):
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM suppliers WHERE id = ?', (supplier_id,))
+    conn.commit()
+    conn.close()
+
+# Obter todas as empresas
+def get_all_companies():
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM company')
+    companies = cursor.fetchall()
+    conn.close()
+    return companies
+
+# Obter todos os fornecedores
+def get_all_suppliers():
+    conn = create_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM suppliers')
     suppliers = cursor.fetchall()
     conn.close()
-    return [s[0] for s in suppliers]
+    return suppliers

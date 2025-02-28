@@ -1,12 +1,12 @@
-import os
-import sys
 import tkinter as tk
-from tkinter import messagebox, ttk, filedialog
+from tkinter import messagebox, ttk, filedialog, simpledialog
 from PIL import Image, ImageTk
 import database
 import openpyxl
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import sys
+import os
 
 # Inicializar o banco de dados
 database.create_tables()
@@ -16,16 +16,20 @@ root = tk.Tk()
 root.title("Sistema de Compras")
 root.geometry("1400x800")
 
+# Função para determinar o caminho base
+def get_base_path():
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
 # Carregar o logotipo como fundo
 def load_background():
     try:
-        # Determina o caminho base dependendo se é executável ou script
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
+        base_path = get_base_path()
         logo_path = os.path.join(base_path, "Logo.jpg")
+        if not os.path.exists(logo_path):
+            raise FileNotFoundError("Logo.jpg não encontrado.")
         img = Image.open(logo_path)
         img = img.resize((1400, 800), Image.Resampling.LANCZOS)
         background_image = ImageTk.PhotoImage(img)
@@ -35,7 +39,7 @@ def load_background():
     except Exception as e:
         messagebox.showwarning("Aviso", f"Erro ao carregar o logotipo: {e}. Continuando sem fundo.")
 
-# Funções da interface (mantidas como no código original)
+# Funções da interface
 def add_item():
     description = entry_description.get()
     code = entry_code.get()
@@ -103,17 +107,19 @@ def mark_as_partially_purchased():
 
 def filter_items():
     status = combo_status.get()
-    supplier = combo_supplier.get()
-    if status and not supplier:
+    supplier = combo_supplier.get().strip()
+    if status and supplier:
+        items = database.get_items_by_status_and_supplier(status, supplier)
+    elif status:
         items = database.get_items_by_status(status)
-    elif supplier and not status:
+    elif supplier:
         items = database.get_items_by_supplier(supplier)
     else:
         items = database.get_all_items()
     update_item_list(items)
 
 def generate_excel():
-    supplier = entry_export_supplier.get()
+    supplier = entry_export_supplier.get().strip()
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Itens"
@@ -125,20 +131,11 @@ def generate_excel():
     wb.save("itens.xlsx")
     messagebox.showinfo("Sucesso", "Planilha gerada como 'itens.xlsx'")
 
-# Função revisada para importar Excel
 def import_excel():
     try:
-        # Determina o caminho base dependendo se é executável ou script
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
+        base_path = get_base_path()
         excel_path = os.path.join(base_path, "itens_preenchidos.xlsx")
-
-        # Verifica se o arquivo existe
         if not os.path.exists(excel_path):
-            # Se não encontrado, permite ao usuário selecionar o arquivo
             excel_path = filedialog.askopenfilename(
                 title="Selecione o arquivo Excel",
                 filetypes=[("Excel files", "*.xlsx")],
@@ -147,7 +144,6 @@ def import_excel():
             if not excel_path:
                 messagebox.showwarning("Aviso", "Importação cancelada. Nenhum arquivo selecionado.")
                 return
-
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
         for row in ws.iter_rows(min_row=2, values_only=True):
@@ -156,10 +152,9 @@ def import_excel():
             for item in items:
                 if item[1] == description and item[2] == code and (item[3] or 'N/A') == (brand or 'N/A'):
                     suppliers_prices = item[5]
-                    # Ajuste para lidar com diferentes formatos de preço
                     if isinstance(price, str):
                         price = price.replace('R$', '').replace('.', '').replace(',', '.')
-                    suppliers_prices[supplier] = float(price) if price else 0
+                    suppliers_prices[supplier.strip()] = float(price) if price else 0
                     database.update_item(item[0], item[1], item[2], item[3], item[4], suppliers_prices)
         update_item_list()
         messagebox.showinfo("Sucesso", "Preços atualizados com sucesso!")
@@ -167,30 +162,34 @@ def import_excel():
         messagebox.showerror("Erro", f"Erro ao importar planilha: {e}")
 
 def generate_pdf():
-    supplier = entry_pdf_supplier.get()
+    supplier = entry_pdf_supplier.get().strip()
     company = database.get_company()
     if not company:
         messagebox.showerror("Erro", "Cadastre a empresa primeiro!")
         return
-    selected = list_items.curselection()
-    if not selected:
-        messagebox.showerror("Erro", "Selecione um item para gerar o pedido!")
+    selected_indices = list_items.curselection()
+    if not selected_indices:
+        messagebox.showerror("Erro", "Selecione pelo menos um item para gerar o pedido!")
         return
-    item = database.get_all_items()[selected[0]]
+    items = [database.get_all_items()[i] for i in selected_indices]
     order_number = len(database.get_all_items()) + 1
     c = canvas.Canvas(f"pedido_{order_number}.pdf", pagesize=letter)
     c.drawString(100, 750, f"Pedido #{order_number}")
     c.drawString(100, 730, f"Empresa: {company[1]} - CNPJ: {company[2]}")
     c.drawString(100, 710, f"Comprador: {company[3]}")
-    c.drawString(100, 690, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'}")
-    c.drawString(100, 670, f"Status: {item[4]}")
-    c.drawString(100, 650, f"Fornecedor: {supplier if supplier else 'Todos'}")
-    c.drawString(100, 630, "Preços:")
-    y = 610
-    for s, p in item[5].items():
-        if not supplier or s == supplier:
-            c.drawString(100, y, f"{s}: R${p:.2f}")
-            y -= 20
+    y = 690
+    for item in items:
+        c.drawString(100, y, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'}")
+        y -= 20
+        c.drawString(100, y, f"Status: {item[4]}")
+        y -= 20
+        c.drawString(100, y, "Preços:")
+        y -= 20
+        for s, p in item[5].items():
+            if not supplier or s.strip() == supplier:
+                c.drawString(100, y, f"{s}: R${p:.2f}")
+                y -= 20
+        y -= 20  # Espaço extra entre itens
     c.save()
     messagebox.showinfo("Sucesso", f"Pedido gerado como 'pedido_{order_number}.pdf'")
 
@@ -215,9 +214,13 @@ def register_supplier():
     database.insert_supplier(name, cnpj, seller_name)
     messagebox.showinfo("Sucesso", "Fornecedor cadastrado com sucesso!")
     supplier_window.destroy()
-    combo_supplier['values'] = database.get_suppliers()
-    entry_export_supplier['values'] = database.get_suppliers()
-    entry_pdf_supplier['values'] = database.get_suppliers()
+    update_supplier_comboboxes()
+
+def update_supplier_comboboxes():
+    suppliers = database.get_suppliers()
+    combo_supplier['values'] = [""] + suppliers
+    entry_export_supplier['values'] = [""] + suppliers
+    entry_pdf_supplier['values'] = [""] + suppliers
 
 def open_company_window():
     global company_window, entry_company_name, entry_company_cnpj, entry_buyer_name
@@ -249,68 +252,149 @@ def open_supplier_window():
     entry_seller_name.pack()
     tk.Button(supplier_window, text="Cadastrar", command=register_supplier).pack()
 
+def alter_company():
+    companies = database.get_all_companies()
+    if not companies:
+        messagebox.showerror("Erro", "Nenhuma empresa cadastrada!")
+        return
+    company_id = simpledialog.askinteger("Alterar Empresa", "Digite o ID da empresa a ser alterada:")
+    if company_id:
+        for company in companies:
+            if company[0] == company_id:
+                name = simpledialog.askstring("Alterar Empresa", "Novo nome:")
+                cnpj = simpledialog.askstring("Alterar Empresa", "Novo CNPJ:")
+                buyer_name = simpledialog.askstring("Alterar Empresa", "Novo nome do comprador:")
+                if name and cnpj and buyer_name:
+                    database.update_company(company_id, name, cnpj, buyer_name)
+                    messagebox.showinfo("Sucesso", "Empresa alterada com sucesso!")
+                else:
+                    messagebox.showerror("Erro", "Todos os campos devem ser preenchidos!")
+                return
+        messagebox.showerror("Erro", "Empresa não encontrada!")
+
+def delete_company():
+    companies = database.get_all_companies()
+    if not companies:
+        messagebox.showerror("Erro", "Nenhuma empresa cadastrada!")
+        return
+    company_id = simpledialog.askinteger("Excluir Empresa", "Digite o ID da empresa a ser excluída:")
+    if company_id:
+        for company in companies:
+            if company[0] == company_id:
+                confirm = messagebox.askyesno("Confirmação", "Tem certeza que deseja excluir esta empresa?")
+                if confirm:
+                    database.delete_company(company_id)
+                    messagebox.showinfo("Sucesso", "Empresa excluída com sucesso!")
+                return
+        messagebox.showerror("Erro", "Empresa não encontrada!")
+
+def alter_supplier():
+    suppliers = database.get_all_suppliers()
+    if not suppliers:
+        messagebox.showerror("Erro", "Nenhum fornecedor cadastrado!")
+        return
+    supplier_id = simpledialog.askinteger("Alterar Fornecedor", "Digite o ID do fornecedor a ser alterado:")
+    if supplier_id:
+        for supplier in suppliers:
+            if supplier[0] == supplier_id:
+                name = simpledialog.askstring("Alterar Fornecedor", "Novo nome:")
+                cnpj = simpledialog.askstring("Alterar Fornecedor", "Novo CNPJ:")
+                seller_name = simpledialog.askstring("Alterar Fornecedor", "Novo nome do vendedor:")
+                if name and cnpj and seller_name:
+                    database.update_supplier(supplier_id, name, cnpj, seller_name)
+                    messagebox.showinfo("Sucesso", "Fornecedor alterado com sucesso!")
+                    update_supplier_comboboxes()
+                else:
+                    messagebox.showerror("Erro", "Todos os campos devem ser preenchidos!")
+                return
+        messagebox.showerror("Erro", "Fornecedor não encontrado!")
+
+def delete_supplier():
+    suppliers = database.get_all_suppliers()
+    if not suppliers:
+        messagebox.showerror("Erro", "Nenhum fornecedor cadastrado!")
+        return
+    supplier_id = simpledialog.askinteger("Excluir Fornecedor", "Digite o ID do fornecedor a ser excluído:")
+    if supplier_id:
+        for supplier in suppliers:
+            if supplier[0] == supplier_id:
+                confirm = messagebox.askyesno("Confirmação", "Tem certeza que deseja excluir este fornecedor?")
+                if confirm:
+                    database.delete_supplier(supplier_id)
+                    messagebox.showinfo("Sucesso", "Fornecedor excluído com sucesso!")
+                    update_supplier_comboboxes()
+                return
+        messagebox.showerror("Erro", "Fornecedor não encontrado!")
+
 # Carregar o fundo ao iniciar
 load_background()
 
-# Campos de entrada no centro
-tk.Label(root, text="Descrição:", bg="white").pack(pady=5)
-entry_description = tk.Entry(root, width=40)
+# Criar frames para layout
+left_frame = tk.Frame(root)
+left_frame.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.Y)
+
+right_frame = tk.Frame(root)
+right_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+# Inputs no frame esquerdo
+tk.Label(left_frame, text="Descrição:", bg="white").pack(pady=5)
+entry_description = tk.Entry(left_frame, width=40)
 entry_description.pack(pady=5)
 
-tk.Label(root, text="Código:", bg="white").pack(pady=5)
-entry_code = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Código:", bg="white").pack(pady=5)
+entry_code = tk.Entry(left_frame, width=40)
 entry_code.pack(pady=5)
 
-tk.Label(root, text="Marca:", bg="white").pack(pady=5)
-entry_brand = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Marca:", bg="white").pack(pady=5)
+entry_brand = tk.Entry(left_frame, width=40)
 entry_brand.pack(pady=5)
 
-tk.Label(root, text="Fornecedor:", bg="white").pack(pady=5)
-entry_supplier = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Fornecedor:", bg="white").pack(pady=5)
+entry_supplier = tk.Entry(left_frame, width=40)
 entry_supplier.pack(pady=5)
 
-tk.Label(root, text="Preço:", bg="white").pack(pady=5)
-entry_price = tk.Entry(root, width=40)
+tk.Label(left_frame, text="Preço:", bg="white").pack(pady=5)
+entry_price = tk.Entry(left_frame, width=40)
 entry_price.pack(pady=5)
 
-# Botões no centro
-tk.Button(root, text="Adicionar Item", command=add_item).pack(pady=5)
-tk.Button(root, text="Remover Item", command=remove_item).pack(pady=5)
-tk.Button(root, text="Marcar como Comprado", command=mark_as_purchased).pack(pady=5)
-tk.Button(root, text="Marcar como Parcialmente Comprado", command=mark_as_partially_purchased).pack(pady=5)
+# Botões no frame esquerdo
+tk.Button(left_frame, text="Adicionar Item", command=add_item).pack(pady=5)
+tk.Button(left_frame, text="Remover Item", command=remove_item).pack(pady=5)
+tk.Button(left_frame, text="Marcar como Comprado", command=mark_as_purchased).pack(pady=5)
+tk.Button(left_frame, text="Marcar como Parcialmente Comprado", command=mark_as_partially_purchased).pack(pady=5)
 
-# Lista de itens no centro
-list_items = tk.Listbox(root, height=20, width=90)
-list_items.pack(pady=10)
-
+# Lista de itens no centro com seleção múltipla
+list_items = tk.Listbox(root, height=20, width=90, selectmode=tk.MULTIPLE)
+list_items.pack(side=tk.LEFT, padx=10, pady=10, fill=tk.BOTH, expand=True)
 update_item_list()
 
-# Filtros no lado direito
-filter_frame = tk.Frame(root)
-filter_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.Y)
-
-tk.Label(filter_frame, text="Filtrar por Status:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-combo_status = ttk.Combobox(filter_frame, values=["A Comprar", "Comprado", "Parcialmente Comprado"], width=60)
+# Filtros no frame direito
+tk.Label(right_frame, text="Filtrar por Status:", bg="white").pack(pady=5, anchor="w")
+combo_status = ttk.Combobox(right_frame, values=["", "A Comprar", "Comprado", "Parcialmente Comprado"], width=20)
 combo_status.pack(pady=5, fill=tk.X)
+combo_status.set("")
 
-tk.Label(filter_frame, text="Filtrar por Fornecedor:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-combo_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Filtrar por Fornecedor:", bg="white").pack(pady=5, anchor="w")
+combo_supplier = ttk.Combobox(right_frame, values=[""] + database.get_suppliers(), width=40)
 combo_supplier.pack(pady=5, fill=tk.X)
+combo_supplier.set("")
 
-tk.Button(filter_frame, text="Filtrar", command=filter_items, width=20).pack(pady=10)
+tk.Button(right_frame, text="Filtrar", command=filter_items, width=20).pack(pady=10)
 
 # Campos para exportar, importar e PDF com fornecedor
-tk.Label(filter_frame, text="Fornecedor para Exportar Excel:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-entry_export_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Fornecedor para Exportar Excel:", bg="white").pack(pady=5, anchor="w")
+entry_export_supplier = ttk.Combobox(right_frame, values=[""] + database.get_suppliers(), width=40)
 entry_export_supplier.pack(pady=5, fill=tk.X)
+entry_export_supplier.set("")
 
-tk.Label(filter_frame, text="Fornecedor para Pedido PDF:", bg="white", width=40, anchor="w").pack(pady=5, fill=tk.X)
-entry_pdf_supplier = ttk.Combobox(filter_frame, values=database.get_suppliers(), width=60)
+tk.Label(right_frame, text="Fornecedor para Pedido PDF:", bg="white").pack(pady=5, anchor="w")
+entry_pdf_supplier = ttk.Combobox(right_frame, values=[""] + database.get_suppliers(), width=40)
 entry_pdf_supplier.pack(pady=5, fill=tk.X)
+entry_pdf_supplier.set("")
 
-tk.Button(filter_frame, text="Exportar Excel", command=generate_excel, width=20).pack(pady=5)
-tk.Button(filter_frame, text="Importar Excel", command=import_excel, width=20).pack(pady=5)
-tk.Button(filter_frame, text="Gerar Pedido em PDF", command=generate_pdf, width=20).pack(pady=5)
+tk.Button(right_frame, text="Exportar Excel", command=generate_excel, width=20).pack(pady=5)
+tk.Button(right_frame, text="Importar Excel", command=import_excel, width=20).pack(pady=5)
+tk.Button(right_frame, text="Gerar Pedido em PDF", command=generate_pdf, width=20).pack(pady=5)
 
 # Menu
 menu = tk.Menu(root)
@@ -319,12 +403,19 @@ root.config(menu=menu)
 cadastro_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Cadastro", menu=cadastro_menu)
 cadastro_menu.add_command(label="Cadastrar Empresa", command=open_company_window)
+cadastro_menu.add_command(label="Alterar Empresa", command=alter_company)
+cadastro_menu.add_command(label="Excluir Empresa", command=delete_company)
 cadastro_menu.add_command(label="Cadastrar Fornecedor", command=open_supplier_window)
+cadastro_menu.add_command(label="Alterar Fornecedor", command=alter_supplier)
+cadastro_menu.add_command(label="Excluir Fornecedor", command=delete_supplier)
 
 compras_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Compras", menu=compras_menu)
 compras_menu.add_command(label="Gerar Planilha Excel", command=generate_excel)
 compras_menu.add_command(label="Importar Planilha Preenchida", command=import_excel)
 compras_menu.add_command(label="Gerar Pedido em PDF", command=generate_pdf)
+
+# Inicializar os fornecedores
+update_supplier_comboboxes()
 
 root.mainloop()
