@@ -44,14 +44,22 @@ def add_item():
     description = entry_description.get()
     code = entry_code.get()
     brand = entry_brand.get()
-    supplier = entry_supplier.get()
+    supplier = combo_supplier_entry.get()  # Usa o valor do Combobox
     price = entry_price.get()
-    if not description or not code or not supplier or not price:
+    quantity = entry_quantity.get()
+    if not description or not code or not supplier or not price or not quantity:
         messagebox.showerror("Erro", "Preencha todos os campos!")
+        return
+    try:
+        quantity = int(quantity)
+        if quantity <= 0:
+            raise ValueError("A quantidade deve ser maior que zero!")
+    except ValueError as e:
+        messagebox.showerror("Erro", str(e) if "quantidade" in str(e) else "Quantidade deve ser um número inteiro!")
         return
     status = "A Comprar"
     suppliers_prices = {supplier: float(price)}
-    database.insert_item(description, code, brand, status, suppliers_prices)
+    database.insert_item(description, code, brand, status, quantity, suppliers_prices)
     update_item_list()
     clear_entries()
 
@@ -60,7 +68,7 @@ def update_item_list(items=None):
     if items is None:
         items = database.get_all_items()
     for item in items:
-        item_text = f"Desc: {item[1]} | Código: {item[2]} | Marca: {item[3] or 'N/A'} | Status: {item[4]} | Fornecedor/Preço: {', '.join([f'{s}: R${p:.2f}' for s, p in item[5].items()])}"
+        item_text = f"Desc: {item[1]} | Código: {item[2]} | Marca: {item[3] or 'N/A'} | Status: {item[4]} | Qtd: {item[5]} | Forn/Preço: {', '.join([f'{s}: R${p:.2f}' for s, p in item[6].items()])}"
         list_items.insert(tk.END, item_text)
         if item[4] == "A Comprar":
             list_items.itemconfig(tk.END, {'fg': 'red'})
@@ -73,8 +81,9 @@ def clear_entries():
     entry_description.delete(0, tk.END)
     entry_code.delete(0, tk.END)
     entry_brand.delete(0, tk.END)
-    entry_supplier.delete(0, tk.END)
+    combo_supplier_entry.set('')  # Limpa o Combobox
     entry_price.delete(0, tk.END)
+    entry_quantity.delete(0, tk.END)
 
 def remove_item():
     selected = list_items.curselection()
@@ -92,7 +101,7 @@ def mark_as_purchased():
         return
     item_id = database.get_all_items()[selected[0]][0]
     item = database.get_all_items()[selected[0]]
-    database.update_item(item_id, item[1], item[2], item[3], "Comprado", item[5])
+    database.update_item(item_id, item[1], item[2], item[3], "Comprado", item[5], item[6])
     update_item_list()
 
 def mark_as_partially_purchased():
@@ -102,7 +111,7 @@ def mark_as_partially_purchased():
         return
     item_id = database.get_all_items()[selected[0]][0]
     item = database.get_all_items()[selected[0]]
-    database.update_item(item_id, item[1], item[2], item[3], "Parcialmente Comprado", item[5])
+    database.update_item(item_id, item[1], item[2], item[3], "Parcialmente Comprado", item[5], item[6])
     update_item_list()
 
 def filter_items():
@@ -123,11 +132,11 @@ def generate_excel():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Itens"
-    ws.append(["Descrição", "Código", "Marca", "Fornecedor", "Preço", "Status"])
+    ws.append(["Descrição", "Código", "Marca", "Fornecedor", "Preço", "Quantidade", "Status"])
     items = database.get_all_items() if not supplier else database.get_items_by_supplier(supplier)
     for item in items:
-        for s, p in item[5].items():
-            ws.append([item[1], item[2], item[3] or 'N/A', s, f"R${p:.2f}", item[4]])
+        for s, p in item[6].items():
+            ws.append([item[1], item[2], item[3] or 'N/A', s, f"R${p:.2f}", item[5], item[4]])
     wb.save("itens.xlsx")
     messagebox.showinfo("Sucesso", "Planilha gerada como 'itens.xlsx'")
 
@@ -147,15 +156,15 @@ def import_excel():
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
         for row in ws.iter_rows(min_row=2, values_only=True):
-            description, code, brand, supplier, price, _ = row
+            description, code, brand, supplier, price, quantity, _ = row
             items = database.get_all_items()
             for item in items:
                 if item[1] == description and item[2] == code and (item[3] or 'N/A') == (brand or 'N/A'):
-                    suppliers_prices = item[5]
+                    suppliers_prices = item[6]
                     if isinstance(price, str):
                         price = price.replace('R$', '').replace('.', '').replace(',', '.')
                     suppliers_prices[supplier.strip()] = float(price) if price else 0
-                    database.update_item(item[0], item[1], item[2], item[3], item[4], suppliers_prices)
+                    database.update_item(item[0], item[1], item[2], item[3], item[4], item[5], suppliers_prices)
         update_item_list()
         messagebox.showinfo("Sucesso", "Preços atualizados com sucesso!")
     except Exception as e:
@@ -179,13 +188,13 @@ def generate_pdf():
     c.drawString(100, 710, f"Comprador: {company[3]}")
     y = 690
     for item in items:
-        c.drawString(100, y, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'}")
+        c.drawString(100, y, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'} - Quantidade: {item[5]}")
         y -= 20
         c.drawString(100, y, f"Status: {item[4]}")
         y -= 20
         c.drawString(100, y, "Preços:")
         y -= 20
-        for s, p in item[5].items():
+        for s, p in item[6].items():
             if not supplier or s.strip() == supplier:
                 c.drawString(100, y, f"{s}: R${p:.2f}")
                 y -= 20
@@ -218,6 +227,7 @@ def register_supplier():
 
 def update_supplier_comboboxes():
     suppliers = database.get_suppliers()
+    combo_supplier_entry['values'] = suppliers  # Atualiza o Combobox de fornecedores no cadastro
     combo_supplier['values'] = [""] + suppliers
     entry_export_supplier['values'] = [""] + suppliers
     entry_pdf_supplier['values'] = [""] + suppliers
@@ -350,12 +360,16 @@ entry_brand = tk.Entry(left_frame, width=40)
 entry_brand.pack(pady=5)
 
 tk.Label(left_frame, text="Fornecedor:", bg="white").pack(pady=5)
-entry_supplier = tk.Entry(left_frame, width=40)
-entry_supplier.pack(pady=5)
+combo_supplier_entry = ttk.Combobox(left_frame, values=database.get_suppliers(), width=37)  # Combobox para fornecedores
+combo_supplier_entry.pack(pady=5)
 
 tk.Label(left_frame, text="Preço:", bg="white").pack(pady=5)
 entry_price = tk.Entry(left_frame, width=40)
 entry_price.pack(pady=5)
+
+tk.Label(left_frame, text="Quantidade:", bg="white").pack(pady=5)
+entry_quantity = tk.Entry(left_frame, width=40)
+entry_quantity.pack(pady=5)
 
 # Botões no frame esquerdo
 tk.Button(left_frame, text="Adicionar Item", command=add_item).pack(pady=5)

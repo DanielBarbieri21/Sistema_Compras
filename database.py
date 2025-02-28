@@ -17,6 +17,7 @@ def create_tables():
             code TEXT NOT NULL,
             brand TEXT,
             status TEXT NOT NULL,
+            quantity INTEGER NOT NULL,
             suppliers_prices TEXT NOT NULL
         )
     ''')
@@ -40,25 +41,25 @@ def create_tables():
     conn.close()
 
 # Inserir novo item
-def insert_item(description, code, brand, status, suppliers_prices):
+def insert_item(description, code, brand, status, quantity, suppliers_prices):
     conn = create_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO items (description, code, brand, status, suppliers_prices)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (description, code, brand, status, json.dumps(suppliers_prices)))
+        INSERT INTO items (description, code, brand, status, quantity, suppliers_prices)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (description, code, brand, status, quantity, json.dumps(suppliers_prices)))
     conn.commit()
     conn.close()
 
 # Atualizar item existente
-def update_item(item_id, description, code, brand, status, suppliers_prices):
+def update_item(item_id, description, code, brand, status, quantity, suppliers_prices):
     conn = create_connection()
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE items
-        SET description = ?, code = ?, brand = ?, status = ?, suppliers_prices = ?
+        SET description = ?, code = ?, brand = ?, status = ?, quantity = ?, suppliers_prices = ?
         WHERE id = ?
-    ''', (description, code, brand, status, json.dumps(suppliers_prices), item_id))
+    ''', (description, code, brand, status, quantity, json.dumps(suppliers_prices), item_id))
     conn.commit()
     conn.close()
 
@@ -77,7 +78,7 @@ def get_all_items():
     cursor.execute('SELECT * FROM items')
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
+    return [(item[0], item[1], item[2], item[3], item[4], item[5], json.loads(item[6])) for item in items]
 
 # Buscar itens por status
 def get_items_by_status(status):
@@ -86,7 +87,7 @@ def get_items_by_status(status):
     cursor.execute('SELECT * FROM items WHERE status = ?', (status,))
     items = cursor.fetchall()
     conn.close()
-    return [(item[0], item[1], item[2], item[3], item[4], json.loads(item[5])) for item in items]
+    return [(item[0], item[1], item[2], item[3], item[4], item[5], json.loads(item[6])) for item in items]
 
 # Buscar itens por fornecedor
 def get_items_by_supplier(supplier):
@@ -97,9 +98,9 @@ def get_items_by_supplier(supplier):
     conn.close()
     result = []
     for item in items:
-        suppliers_prices = json.loads(item[5])
+        suppliers_prices = json.loads(item[6])
         if supplier in suppliers_prices:
-            result.append((item[0], item[1], item[2], item[3], item[4], suppliers_prices))
+            result.append((item[0], item[1], item[2], item[3], item[4], item[5], suppliers_prices))
     return result
 
 # Busca combinada por status e fornecedor
@@ -111,9 +112,9 @@ def get_items_by_status_and_supplier(status, supplier):
     conn.close()
     result = []
     for item in items:
-        suppliers_prices = json.loads(item[5])
+        suppliers_prices = json.loads(item[6])
         if supplier in suppliers_prices:
-            result.append((item[0], item[1], item[2], item[3], item[4], suppliers_prices))
+            result.append((item[0], item[1], item[2], item[3], item[4], item[5], suppliers_prices))
     return result
 
 # Buscar fornecedores
