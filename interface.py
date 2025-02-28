@@ -190,7 +190,7 @@ def generate_pdf():
     for item in items:
         c.drawString(100, y, f"Item: {item[1]} - Código: {item[2]} - Marca: {item[3] or 'N/A'} - Quantidade: {item[5]}")
         y -= 20
-        c.drawString(100, y, f"Status: {item[4]}")
+        #c.drawString(100, y, f"Status: {item[4]}")
         y -= 20
         c.drawString(100, y, "Preços:")
         y -= 20
