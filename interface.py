@@ -155,18 +155,48 @@ def import_excel():
                 return
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
+        updated_items = 0  # Contador para itens atualizados
         for row in ws.iter_rows(min_row=2, values_only=True):
-            description, code, brand, supplier, price, quantity, _ = row
+            # Desempacotar os 6 primeiros valores e ignorar o restante
+            description, code, brand, supplier, price, quantity, *rest = row
+            print(f"Lendo da planilha: description={description}, code={code}, brand={brand}, supplier={supplier}, price={price}, quantity={quantity}")
+
+            # Normalizar os valores para comparação
+            description = str(description).strip().upper() if description else ""
+            code = str(code).strip() if code else ""
+            brand = str(brand).strip().upper() if brand else "N/A"
+            supplier = str(supplier).strip() if supplier else ""
+
             items = database.get_all_items()
+            found_match = False
             for item in items:
-                if item[1] == description and item[2] == code and (item[3] or 'N/A') == (brand or 'N/A'):
+                # Normalizar os valores do banco para comparação
+                item_description = str(item[1]).strip().upper() if item[1] else ""
+                item_code = str(item[2]).strip() if item[2] else ""
+                item_brand = str(item[3]).strip().upper() if item[3] else "N/A"
+
+                # Comparar descrição, código e marca
+                if (item_description == description and 
+                    item_code == code and 
+                    item_brand == brand):
+                    found_match = True
                     suppliers_prices = item[6]
                     if isinstance(price, str):
-                        price = price.replace('R$', '').replace('.', '').replace(',', '.')
-                    suppliers_prices[supplier.strip()] = float(price) if price else 0
+                        price = price.replace('R$', '').replace(',', '.').strip()
+                    price_value = float(price) if price else 0.0
+                    print(f"Atualizando item: {item[1]} - Fornecedor: {supplier}, Novo preço: {price_value}")
+                    suppliers_prices[supplier] = price_value
                     database.update_item(item[0], item[1], item[2], item[3], item[4], item[5], suppliers_prices)
+                    updated_items += 1
+                    break
+            if not found_match:
+                print(f"Não encontrou correspondência para: description={description}, code={code}, brand={brand}")
+
         update_item_list()
-        messagebox.showinfo("Sucesso", "Preços atualizados com sucesso!")
+        if updated_items > 0:
+            messagebox.showinfo("Sucesso", f"{updated_items} itens atualizados com sucesso!")
+        else:
+            messagebox.showwarning("Aviso", "Nenhum item foi atualizado. Verifique se os dados da planilha correspondem aos itens no banco de dados.")
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao importar planilha: {e}")
 
