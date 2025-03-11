@@ -139,7 +139,6 @@ def generate_excel():
             ws.append([item[1], item[2], item[3] or 'N/A', s, f"R${p:.2f}", item[5], item[4]])
     wb.save("itens.xlsx")
     messagebox.showinfo("Sucesso", "Planilha gerada como 'itens.xlsx'")
-
 def import_excel():
     try:
         base_path = get_base_path()
@@ -156,6 +155,7 @@ def import_excel():
         wb = openpyxl.load_workbook(excel_path)
         ws = wb.active
         updated_items = 0  # Contador para itens atualizados
+        added_items = 0    # Contador para itens adicionados
         for row in ws.iter_rows(min_row=2, values_only=True):
             # Desempacotar os 6 primeiros valores e ignorar o restante
             description, code, brand, supplier, price, quantity, *rest = row
@@ -166,6 +166,7 @@ def import_excel():
             code = str(code).strip() if code else ""
             brand = str(brand).strip().upper() if brand else "N/A"
             supplier = str(supplier).strip() if supplier else ""
+            status = "A Comprar"  # Status padrão para novos itens
 
             items = database.get_all_items()
             found_match = False
@@ -184,21 +185,39 @@ def import_excel():
                     if isinstance(price, str):
                         price = price.replace('R$', '').replace(',', '.').strip()
                     price_value = float(price) if price else 0.0
-                    print(f"Atualizando item: {item[1]} - Fornecedor: {supplier}, Novo preço: {price_value}")
+                    print(f"Atualizando item existente (ID={item[0]}): Fornecedor: {supplier}, Novo preço: {price_value}")
                     suppliers_prices[supplier] = price_value
-                    database.update_item(item[0], item[1], item[2], item[3], item[4], item[5], suppliers_prices)
+                    database.update_item(item[0], item[1], item[2], item[3], status, quantity, suppliers_prices)
                     updated_items += 1
                     break
-            if not found_match:
-                print(f"Não encontrou correspondência para: description={description}, code={code}, brand={brand}")
+
+            # Se não encontrou correspondência, adicionar novo item
+            if not found_match and description and code:
+                try:
+                    suppliers_prices = {}
+                    if isinstance(price, str):
+                        price = price.replace('R$', '').replace(',', '.').strip()
+                    price_value = float(price) if price else 0.0
+                    quantity_value = float(quantity) if quantity else 0.0
+                    suppliers_prices[supplier] = price_value
+                    item_id = database.add_item(description, code, brand, quantity_value)  # Adiciona e retorna o ID
+                    if item_id:
+                        database.update_item(item_id, description, code, brand, status, quantity_value, suppliers_prices)
+                        print(f"Adicionado novo item (ID={item_id}): {description}, Preço: {price_value}")
+                        added_items += 1
+                    else:
+                        print(f"Falha ao adicionar item: {description}, {code}")
+                except Exception as e:
+                    print(f"Erro ao adicionar novo item ({description}, {code}): {e}")
 
         update_item_list()
-        if updated_items > 0:
-            messagebox.showinfo("Sucesso", f"{updated_items} itens atualizados com sucesso!")
+        if updated_items > 0 or added_items > 0:
+            messagebox.showinfo("Sucesso", f"{updated_items} itens atualizados e {added_items} itens adicionados com sucesso!")
         else:
-            messagebox.showwarning("Aviso", "Nenhum item foi atualizado. Verifique se os dados da planilha correspondem aos itens no banco de dados.")
+            messagebox.showwarning("Aviso", "Nenhum item foi atualizado ou adicionado. Verifique se os dados da planilha são válidos.")
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao importar planilha: {e}")
+        print(f"Erro detalhado: {e}")
 
 def generate_pdf():
     supplier = entry_pdf_supplier.get().strip()
