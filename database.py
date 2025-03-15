@@ -4,7 +4,7 @@ import json
 # Função para conectar ao banco de dados
 def create_connection():
     try:
-        conn = sqlite3.connect('compras.db')
+        conn = sqlite3.connect('database.db')
         return conn
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")
@@ -187,13 +187,9 @@ def get_suppliers():
         return []
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT suppliers_prices FROM items')
-        rows = cursor.fetchall()
-        suppliers = set()
-        for row in rows:
-            prices = json.loads(row[0])
-            suppliers.update(prices.keys())
-        return sorted(list(suppliers))
+        cursor.execute('SELECT name FROM suppliers')
+        suppliers = cursor.fetchall()
+        return [supplier[0] for supplier in suppliers]  # Retorna apenas os nomes dos fornecedores
     except Exception as e:
         print(f"Erro ao buscar fornecedores: {e}")
         return []
