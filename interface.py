@@ -8,6 +8,7 @@ from reportlab.pdfgen import canvas
 import sys
 import os
 
+
 # Inicializar o banco de dados
 database.create_tables()
 
