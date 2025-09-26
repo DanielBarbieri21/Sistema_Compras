@@ -1,10 +1,18 @@
 import sqlite3
 import json
+from pathlib import Path
 
 # Função para conectar ao banco de dados
 def create_connection():
     try:
-        conn = sqlite3.connect('database.db')
+        # Usar o caminho do banco de dados do config se disponível
+        try:
+            from config import DATABASE_PATH
+            db_path = DATABASE_PATH
+        except ImportError:
+            db_path = 'database.db'
+        
+        conn = sqlite3.connect(db_path)
         return conn
     except Exception as e:
         print(f"Erro ao conectar ao banco de dados: {e}")

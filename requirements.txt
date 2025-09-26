@@ -1,0 +1,23 @@
+# Dependências do Sistema de Compras
+# Interface moderna
+ttkbootstrap==1.10.1
+
+# Processamento de dados (pandas removido para evitar build de numpy)
+openpyxl==3.1.2
+
+# Geração de relatórios (PDF)
+reportlab==4.0.7
+
+# Banco de dados
+
+
+# Processamento de imagens
+# Pillow opcional
+
+# Utilitários
+python-dateutil==2.8.2
+schedule==1.2.0
+
+# Logging e configuração
+python-dotenv==1.0.0
+
