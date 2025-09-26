@@ -1,0 +1,22 @@
+2025-09-26 13:16:03,636 - INFO - Inicialização do Sistema de Compras iniciada
+2025-09-26 13:16:03,651 - INFO - Carregando main.main() e iniciando UI
+2025-09-26 13:16:03,901 - ERROR - Erro ao iniciar aplicação
+Traceback (most recent call last):
+  File "run.py", line 69, in main
+    from main import main as run_app
+  File "PyInstaller\loader\pyimod02_importers.py", line 450, in exec_module
+  File "main.py", line 16, in <module>
+    from views.main_interface import MainInterface
+  File "PyInstaller\loader\pyimod02_importers.py", line 450, in exec_module
+  File "views\__init__.py", line 4, in <module>
+    from .main_interface import MainInterface
+  File "PyInstaller\loader\pyimod02_importers.py", line 450, in exec_module
+  File "views\main_interface.py", line 6, in <module>
+    import ttkbootstrap as ttk
+ModuleNotFoundError: No module named 'ttkbootstrap'
+2025-09-26 13:18:27,964 - INFO - Inicialização do Sistema de Compras iniciada
+2025-09-26 13:18:27,968 - INFO - Carregando main.main() e iniciando UI
+2025-09-26 13:18:53,835 - INFO - Aplicação finalizada
+2025-09-26 13:19:27,415 - INFO - Inicialização do Sistema de Compras iniciada
+2025-09-26 13:19:27,417 - INFO - Carregando main.main() e iniciando UI
+2025-09-26 13:23:24,085 - INFO - Aplicação finalizada

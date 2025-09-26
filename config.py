@@ -5,7 +5,16 @@ import os
 from pathlib import Path
 
 # Diretórios
-BASE_DIR = Path(__file__).parent
+# Quando empacotado com PyInstaller, __file__ pode apontar para o diretório temporário (_MEIPASS).
+# Usamos o diretório do executável para armazenar base de dados, backups e logs.
+try:
+    import sys
+    if getattr(sys, 'frozen', False):
+        BASE_DIR = Path(sys.executable).parent
+    else:
+        BASE_DIR = Path(__file__).parent
+except Exception:
+    BASE_DIR = Path(__file__).parent
 DATABASE_PATH = BASE_DIR / "database.db"
 BACKUP_DIR = BASE_DIR / "backups"
 LOGS_DIR = BASE_DIR / "logs"
